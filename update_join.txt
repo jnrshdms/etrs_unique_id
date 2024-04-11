@@ -127,7 +127,6 @@ SELECT *, COUNT(*) AS DUPLICATE FROM `etrs_final` GROUP BY emp_id, sp_id, final_
 
 
 git init
-git add unique_id.php
 git commit -m "first commit"
 git branch -M main
 git remote add origin https://github.com/jnrshdms/etrs_unique_id.git
