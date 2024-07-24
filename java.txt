@@ -1,0 +1,285 @@
+public void addUser(User user) {  
+    try (Connection connection = DB.MySQL()) {
+        // Check if the user ID already exists
+        String checkSql = "SELECT COUNT(*) FROM ADMIN_Users WHERE UserID = ?";
+        try (PreparedStatement checkStatement = connection.prepareStatement(checkSql)) {
+            checkStatement.setString(1, user.getuserID());
+            try (ResultSet resultSet = checkStatement.executeQuery()) {
+                if (resultSet.next() && resultSet.getInt(1) > 0) {
+                    throw new Exception("UserID already exists");
+                }
+            }
+        }
+
+        // Proceed to insert the new user
+        String sql = "INSERT INTO ADMIN_Users(UserID, FirstName, LastName, UserEmail, UserRole, Password, CreatedBy) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+            preparedStatement.setString(1, user.getuserID());  
+            preparedStatement.setString(2, user.getfirstName());  
+            preparedStatement.setString(3, user.getlastName());  
+            preparedStatement.setString(4, user.getemailAddress());
+            preparedStatement.setString(5, user.getuserRole());
+            preparedStatement.setString(6, user.getpassword());
+            preparedStatement.setString(7, user.getcreatedBy());
+            preparedStatement.executeUpdate();  
+        }      
+    } catch (Exception ex) {
+        ex.printStackTrace();  
+    }
+}
+
+
+@WebServlet("/Administration/AddNew")
+public class AddNew extends HttpServlet {
+    private static final long serialVersionUID = 1L;
+
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        String UserID = request.getParameter("UserID");
+        String FirstName = request.getParameter("FirstName");
+        String LastName = request.getParameter("LastName");
+        String EmailAddress = request.getParameter("UserEmail");
+        String UserRole = request.getParameter("UserRole");
+        String Password = request.getParameter("Password");
+        String CreatedBy = request.getParameter("CreatedBy");
+        
+        String hashedPassword = BCrypt.hashpw(Password, BCrypt.gensalt());
+        User user = new User();
+        user.setuserID(UserID);
+        user.setfirstName(FirstName);
+        user.setlastName(LastName);
+        user.setemailAddress(EmailAddress);
+        user.setuserRole(UserRole);
+        user.setpassword(hashedPassword);
+        user.setcreatedBy(CreatedBy);
+        
+        UserDAL userDAL = new UserDAL();
+        try {
+            userDAL.addUser(user);
+            response.setStatus(HttpServletResponse.SC_OK);
+        } catch (Exception e) {
+            response.setStatus(HttpServletResponse.SC_CONFLICT);
+            response.getWriter().write("UserID already exists. Please choose a different UserID.");
+        }
+    }
+}
+
+$('#addform').on('submit', function(e) {
+    e.preventDefault(); 
+    $.ajax({
+        url: '${baseurl}/Administration/AddNew',
+        type: 'POST',
+        data: $('#addform').serialize(),
+        success: function(response) {
+            swal.fire({
+                title: 'User Added!',
+                text: 'The user has been successfully added.',
+                icon: 'success',
+                willClose: function() {
+                    $('#AddModal').modal('hide'); 
+                    location.reload();                                 
+                }
+            });
+        },
+        error: function(xhr, status, error) {
+            console.error('Error adding user:', error);
+            $('#errorModal .modal-body').text(xhr.responseText);
+            $('#errorModal').modal('show');
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        var emailInput = document.getElementById('userEmail');
+        emailInput.addEventListener('input', function() {
+            var email = emailInput.value.trim();
+            var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+            if (emailRegex.test(email)) {
+                emailInput.classList.remove('is-invalid');
+                emailInput.classList.add('is-valid');
+            } else {
+                emailInput.classList.remove('is-valid');
+                emailInput.classList.add('is-invalid');
+            }
+        });
+    });
+});
+
+<!-- Error Modal -->
+<div class="modal fade" id="errorModal" tabindex="-1" role="dialog" aria-labelledby="errorModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="errorModalLabel">Error</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Error message will be inserted here by JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+onclick
+  <tr onclick="showButtons(this)">
+<script>
+function showButtons(row) {
+   
+    const allEditButtons = document.querySelectorAll('.edit-button');
+    const allActiveButtons = document.querySelectorAll('.active-button');
+    
+    allEditButtons.forEach(button => button.style.display = 'none');
+    allActiveButtons.forEach(button => button.style.display = 'none');
+    
+    const editButton = row.querySelector('.edit-button');
+    const activeButton = row.querySelector('.active-button');
+    
+    if (editButton && activeButton) {
+        editButton.style.display = 'inline-block';
+        activeButton.style.display = 'inline-block';
+    }
+}
+</script>
+  
+
+// getrole
+ public List<String> getAllRoles() {
+        List<String> roles = new ArrayList<>();
+        String sql = "SELECT role_name FROM Admin_userRole";
+        try (Connection connection = DB.MySQL();
+             PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet resultSet = statement.executeQuery()) {
+            while (resultSet.next()) {
+                roles.add(resultSet.getString("role_name"));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return roles;
+    }
+
+    public List<String> getAllModules() {
+        List<String> modules = new ArrayList<>();
+        String sql = "SELECT module_name FROM Admin_modules";
+        try (Connection connection = DB.MySQL();
+             PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet resultSet = statement.executeQuery()) {
+            while (resultSet.next()) {
+                modules.add(resultSet.getString("module_name"));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return modules;
+    }
+}
+protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        UserDAL userDAL = new UserDAL();
+        List<String> roles = userDAL.getAllRoles();
+        List<String> modules = userDAL.getAllModules();
+        request.setAttribute("roles", roles);
+        request.setAttribute("modules", modules);
+        request.getRequestDispatcher("/path/to/addUser.jsp").forward(request, response);
+    }
+
+
+<div class="form-group row">
+                                <label for="role" class="col-sm-3 col-form-label control-label">Role</label>
+                                <div class="col-sm-6">
+                                    <select id="selectRole" class="form-control select2" name="UserRole">
+                                        <c:forEach var="role" items="${roles}">
+                                            <option value="${role}">${role}</option>
+                                        </c:forEach>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group row" id="modulesRow" style="display: none;">
+                                <label for="modules" class="col-sm-3 col-form-label control-label">Modules</label>
+                                <div class="col-sm-6">
+                                    <select id="selectModules" class="form-control select2" name="Modules" multiple="multiple">
+                                        <c:forEach var="module" items="${modules}">
+                                            <option value="${module}">${module}</option>
+                                        </c:forEach>
+                                    </select>
+                                </div>
+                            </div>
+
+$('.select2').select2();
+
+    $('#selectRole').on('change', function() {
+        if ($(this).val() === 'User') {
+            $('#modulesRow').show();
+        } else {
+            $('#modulesRow').hide();
+        }
+    });
+
+ public void addUser(User user, List<String> modules) {
+        Connection connection = null;
+        PreparedStatement userStatement = null;
+        PreparedStatement moduleStatement = null;
+        
+        try {
+            connection = DB.MySQL();
+            connection.setAutoCommit(false);
+
+            String userSql = "INSERT INTO admin_user(UserID, FirstName, LastName, UserEmail, UserRole, Password, CreatedBy) VALUES (?, ?, ?, ?, ?, ?, ?)";
+            userStatement = connection.prepareStatement(userSql, Statement.RETURN_GENERATED_KEYS);
+            
+            userStatement.setString(1, user.getUserID());
+            userStatement.setString(2, user.getFirstName());
+            userStatement.setString(3, user.getLastName());
+            userStatement.setString(4, user.getEmailAddress());
+            userStatement.setString(5, user.getUserRole());
+            userStatement.setString(6, user.getPassword());
+            userStatement.setString(7, user.getCreatedBy());
+            userStatement.executeUpdate();
+
+            ResultSet generatedKeys = userStatement.getGeneratedKeys();
+            if (generatedKeys.next()) {
+                int userId = generatedKeys.getInt(1);
+
+                if (user.getUserRole().equals("User")) {
+                    String moduleSql = "INSERT INTO admin_usersmodule(UserID, ModuleName) VALUES (?, ?)";
+                    moduleStatement = connection.prepareStatement(moduleSql);
+                    for (String module : modules) {
+                        moduleStatement.setInt(1, userId);
+                        moduleStatement.setString(2, module);
+                        moduleStatement.addBatch();
+                    }
+                    moduleStatement.executeBatch();
+                }
+            }
+            
+            connection.commit();
+        } catch (Exception ex) {
+            if (connection != null) {
+                try {
+                    connection.rollback();
+                } catch (Exception rollbackEx) {
+                    rollbackEx.printStackTrace();
+                }
+            }
+            ex.printStackTrace();
+        } finally {
+            try {
+                if (userStatement != null) {
+                    userStatement.close();
+                }
+                if (moduleStatement != null) {
+                    moduleStatement.close();
+                }
+                if (connection != null) {
+                    connection.close();
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }
+    }
+
