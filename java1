@@ -1,0 +1,92 @@
+
+ADD NEW USER
+DAL
+public boolean isUserIdUnique(String userId) {
+    String query = "SELECT COUNT(*) FROM Admin_Users WHERE user_id = ?";
+    try (Connection conn = DriverManager.getConnection(DB_URL, USER, PASS);
+         PreparedStatement stmt = conn.prepareStatement(query)) {
+        stmt.setString(1, userId);
+        ResultSet rs = stmt.executeQuery();
+        if (rs.next()) {
+            return rs.getInt(1) == 0;
+        }
+    } catch (SQLException e) {
+        e.printStackTrace();
+    }
+    return false;
+}
+public boolean isValidEmail(String email) {
+    String regex = "^[a-zA-Z0-9_+&*-]+(?:\\.[a-zA-Z0-9_+&*-]+)*@(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,7}$";
+    return email.matches(regex);
+}
+public List<String> getRoles() {
+    List<String> roles = new ArrayList<>();
+    String query = "SELECT role_name FROM Admin_UserRoles";
+    try (Connection conn = DriverManager.getConnection(DB_URL, USER, PASS);
+         Statement stmt = conn.createStatement();
+         ResultSet rs = stmt.executeQuery(query)) {
+        while (rs.next()) {
+            roles.add(rs.getString("role_name"));
+        }
+    } catch (SQLException e) {
+        e.printStackTrace();
+    }
+    return roles;
+}
+public List<String> getModules() {
+    List<String> modules = new ArrayList<>();
+    String query = "SELECT module_name FROM Admin_Modules";
+    try (Connection conn = DriverManager.getConnection(DB_URL, USER, PASS);
+         Statement stmt = conn.createStatement();
+         ResultSet rs = stmt.executeQuery(query)) {
+        while (rs.next()) {
+            modules.add(rs.getString("module_name"));
+        }
+    } catch (SQLException e) {
+        e.printStackTrace();
+    }
+    return modules;
+}
+public void saveUser(String userId, String email, String role, List<String> modules) {
+    String insertUserQuery = "INSERT INTO Admin_Users (user_id, email, role) VALUES (?, ?, ?)";
+    try (Connection conn = DriverManager.getConnection(DB_URL, USER, PASS);
+         PreparedStatement stmt = conn.prepareStatement(insertUserQuery)) {
+        stmt.setString(1, userId);
+        stmt.setString(2, email);
+        stmt.setString(3, role);
+        stmt.executeUpdate();
+        
+        // Save user modules
+        String insertModuleQuery = "INSERT INTO Admin_UsersModules (user_id, module_name) VALUES (?, ?)";
+        try (PreparedStatement moduleStmt = conn.prepareStatement(insertModuleQuery)) {
+            for (String module : modules) {
+                moduleStmt.setString(1, userId);
+                moduleStmt.setString(2, module);
+                moduleStmt.addBatch();
+            }
+            moduleStmt.executeBatch();
+        }
+    } catch (SQLException e) {
+        e.printStackTrace();
+    }
+}
+ 
+
+
+EDIT USER
+1. Edit Button (icon pen) will open edit modal.
+2. User ID is not editable.
+3. Use the same modal that you use from Add New User in Edit User.
+4. Save user details on Admin_Users table
+5. Save user modules to Admin_UsersModules table
+
+ACTIVATE/DEACTIVATE USER
+1. Activate/Deactivate button will only appear when you select a row from the table.
+2. If the status of the user is Active the button will show check icon otherwise, it will show
+cross/times icon.
+3. Use https://fontawesome.com/icons/
+
+EXPORT TO PDF
+1. Create a pdf file with list of user using PDFMAKE
+http://pdfmake.org/playground.html
+2. Active column should be Status, if value is 0 display ‘Inactive’ else ‘Active’
