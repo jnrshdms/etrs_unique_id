@@ -1,0 +1,455 @@
+<-- PDF -->
+<-- PDF Button -->
+ <div class="btn btn-success">
+        <form action="PDF" method="get" id="pdfForm">
+            <button type="submit" class="btn btn-success pdf-btn">
+                <i class="fa fa-file-pdf"></i> Generate PDF
+            </button>
+        </form>
+    </div>
+
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.72/pdfmake.min.js"></script>
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.72/vfs_fonts.js"></script>
+ <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+ <script>
+        $(document).ready(function() {
+            $('#pdfForm').submit(function(event) {
+                event.preventDefault();
+                $.ajax({
+                    url: 'PDF',
+                    method: 'GET',
+                    success: function(data) {
+                        var users = JSON.parse(data);
+                        var docDefinition = {
+                            header: {
+                                text: 'User List',
+                                style: 'header'
+                            },
+                            content: [
+                                {
+                                    table: {
+                                        headerRows: 1,
+                                        widths: ['*', '*', '*', '*', '*', '*'],
+                                        body: [
+                                            ['User ID', 'First Name', 'Last Name', 'Email', 'Role', 'Status'],
+                                            ...users.map(user => [
+                                                user.userID,
+                                                user.firstName,
+                                                user.lastName,
+                                                user.emailAddress,
+                                                user.userRole,
+                                                user.isActive === '0' ? 'Inactive' : 'Active'
+                                            ])
+                                        ]
+                                    }
+                                }
+                            ],
+                            styles: {
+                                header: {
+                                    fontSize: 18,
+                                    bold: true,
+                                    margin: [0, 0, 0, 10]
+                                }
+                            }
+                        };
+                        pdfMake.createPdf(docDefinition).download('users.pdf');
+                    },
+                    error: function(err) {
+                        console.error(err);
+                    }
+                });
+            });
+        });
+    </script>
+
+  <-- PDF Servlet -->
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.List;
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import com.google.gson.Gson;
+
+@WebServlet("/PDF")
+public class PDFServlet extends HttpServlet {
+    private static final long serialVersionUID = 1L;
+
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+
+        try {
+            List<User> userList = new UserDAL().GetAllUsersPDF();
+            PrintWriter out = response.getWriter();
+            Gson gson = new Gson();
+            String userJson = gson.toJson(userList);
+            out.print(userJson);
+            out.flush();
+        } catch (Exception e) {
+            e.printStackTrace();
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+        }
+    }
+}
+
+<-- ACTIVATE/DEACTIVATE -->
+<-- DAL -->
+public void updateUserStatus(String userID, String isActive) {
+    String sql = "UPDATE ADMIN_Users SET IsActive = ? WHERE UserID = ?";
+    try (Connection connection = DB.MySQL();
+         PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+        preparedStatement.setString(1, isActive); 
+        preparedStatement.setString(2, userID);
+        preparedStatement.executeUpdate();
+    } catch (Exception e) {
+        e.printStackTrace();
+    }
+}
+
+<-- jsp -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        .selected-row {
+            background-color: #d3d3d3; /* Change as needed */
+        }
+        .btn-activate {
+            display: none;
+            margin-top: 10px;
+        }
+        .btn-activate.active {
+            display: inline;
+        }
+    </style>
+
+    <table class="display" id="usersTable" style="width:100%">
+        <thead>
+            <tr>
+                <th>User ID</th>
+                <th>First Name</th>
+                <th>Last Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Assuming userList is already populated here -->
+            <c:forEach items="${userList}" var="user">
+                <tr data-user-id="${user.userID}" data-status="${user.isActive}">
+                    <td>${user.userID}</td>
+                    <td>${user.firstName}</td>
+                    <td>${user.lastName}</td>
+                    <td>${user.emailAddress}</td>
+                    <td>${user.userRole}</td>
+                    <td>${user.isActive == '0' ? 'Inactive' : 'Active'}</td>
+                </tr>
+            </c:forEach>
+        </tbody>
+    </table>
+    <button id="btnActivateDeactivate" class="btn-activate">
+        <i id="btnIcon" class=""></i>
+        Activate/Deactivate
+    </button>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            let selectedRow = null;
+
+            $('#usersTable tbody').on('click', 'tr', function() {
+             
+                if (selectedRow) {
+                    $(selectedRow).removeClass('selected-row');
+                }
+
+             
+                $(this).addClass('selected-row');
+                selectedRow = this;
+
+                
+                $('#btnActivateDeactivate').addClass('active');
+                
+               
+                const isActive = $(this).data('status');
+                if (isActive == '1') {
+                    $('#btnIcon').attr('class', 'fa fa-check');
+                } else {
+                    $('#btnIcon').attr('class', 'fa fa-times');
+                }
+            });
+
+           
+            $('#btnActivateDeactivate').click(function() {
+                if (selectedRow) {
+                    const userId = $(selectedRow).data('user-id');
+                    const currentStatus = $(selectedRow).data('status');
+                    const newStatus = currentStatus == '1' ? '0' : '1';
+
+                   
+                    $.ajax({
+                        url: 'UpdateUserStatus', 
+                        method: 'POST',
+                        data: {
+                            userID: userId,
+                            status: newStatus
+                        },
+                        success: function() {
+                            // Update the status in the table
+                            $(selectedRow).data('status', newStatus);
+                            $(selectedRow).find('td').eq(5).text(newStatus == '1' ? 'Active' : 'Inactive');
+                            $('#btnIcon').attr('class', newStatus == '1' ? 'fa fa-check' : 'fa fa-times');
+                        },
+                        error: function() {
+                            alert('Failed to update status');
+                        }
+                    });
+                }
+            });
+        });
+    </script>
+
+      <-- servelt -->
+import java.io.IOException;
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+@WebServlet("/UpdateUserStatus")
+public class UpdateUserStatusServlet extends HttpServlet {
+    private static final long serialVersionUID = 1L;
+
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        String userID = request.getParameter("userID");
+        String status = request.getParameter("status");
+
+        try {
+            // Call your DAL method to update user status
+            UserDAL userDAL = new UserDAL();
+            userDAL.updateUserStatus(userID, status);
+            response.setStatus(HttpServletResponse.SC_OK);
+        } catch (Exception e) {
+            e.printStackTrace();
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+        }
+    }
+}
+
+<-- Edit -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Edit User</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <style>
+        .selected-row {
+            background-color: #d3d3d3; /* Change as needed */
+        }
+        #editModal {
+            display: none; /* Hide modal by default */
+        }
+    </style>
+</head>
+<body>
+    <table class="display" id="usersTable" style="width:100%">
+        <thead>
+            <tr>
+                <th>User ID</th>
+                <th>First Name</th>
+                <th>Last Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <c:forEach items="${userList}" var="user">
+                <tr data-user-id="${user.userID}">
+                    <td>${user.userID}</td>
+                    <td>${user.firstName}</td>
+                    <td>${user.lastName}</td>
+                    <td>${user.emailAddress}</td>
+                    <td>${user.userRole}</td>
+                    <td>${user.isActive == '0' ? 'Inactive' : 'Active'}</td>
+                    <td>
+                        <button class="edit-btn">
+                            <i class="fa fa-pen"></i> Edit
+                        </button>
+                    </td>
+                </tr>
+            </c:forEach>
+        </tbody>
+    </table>
+
+    <!-- Edit Modal -->
+    <div id="editModal" title="Edit User">
+        <form id="editForm">
+            <input type="hidden" id="userID" name="userID">
+            <div>
+                <label for="firstName">First Name:</label>
+                <input type="text" id="firstName" name="firstName" required>
+            </div>
+            <div>
+                <label for="lastName">Last Name:</label>
+                <input type="text" id="lastName" name="lastName" required>
+            </div>
+            <div>
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            <div>
+                <label for="role">Role:</label>
+                <input type="text" id="role" name="role" required>
+            </div>
+            <div>
+                <label for="status">Status:</label>
+                <select id="status" name="status">
+                    <option value="1">Active</option>
+                    <option value="0">Inactive</option>
+                </select>
+            </div>
+            <input type="submit" value="Save">
+        </form>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <script>
+        $(document).ready(function() {
+            let selectedRow = null;
+
+            // Handle row click
+            $('#usersTable tbody').on('click', 'tr', function() {
+                if (selectedRow) {
+                    $(selectedRow).removeClass('selected-row');
+                }
+                $(this).addClass('selected-row');
+                selectedRow = this;
+
+                $('#editModal').dialog('open');
+            });
+
+            // Handle edit button click
+            $('#usersTable').on('click', '.edit-btn', function(event) {
+                event.stopPropagation(); // Prevent row click from opening modal
+                const row = $(this).closest('tr');
+                const userID = row.data('user-id');
+                const firstName = row.find('td').eq(1).text();
+                const lastName = row.find('td').eq(2).text();
+                const email = row.find('td').eq(3).text();
+                const role = row.find('td').eq(4).text();
+                const status = row.find('td').eq(5).text() === 'Active' ? '1' : '0';
+
+                // Fill the modal form
+                $('#userID').val(userID);
+                $('#firstName').val(firstName);
+                $('#lastName').val(lastName);
+                $('#email').val(email);
+                $('#role').val(role);
+                $('#status').val(status);
+
+                $('#editModal').dialog('open');
+            });
+
+            // Initialize jQuery UI dialog for the modal
+            $('#editModal').dialog({
+                autoOpen: false,
+                modal: true,
+                width: 400,
+                buttons: {
+                    "Save": function() {
+                        const formData = $('#editForm').serialize();
+                        $.ajax({
+                            url: 'UpdateUser',
+                            method: 'POST',
+                            data: formData,
+                            success: function(response) {
+                                if (response === 'success') {
+                                    const row = $(selectedRow);
+                                    row.find('td').eq(1).text($('#firstName').val());
+                                    row.find('td').eq(2).text($('#lastName').val());
+                                    row.find('td').eq(3).text($('#email').val());
+                                    row.find('td').eq(4).text($('#role').val());
+                                    row.find('td').eq(5).text($('#status').val() === '1' ? 'Active' : 'Inactive');
+                                    $('#editModal').dialog('close');
+                                } else {
+                                    alert('Failed to update user');
+                                }
+                            },
+                            error: function() {
+                                alert('Failed to update user');
+                            }
+                        });
+                    },
+                    "Cancel": function() {
+                        $(this).dialog('close');
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
+
+      import java.io.IOException;
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+@WebServlet("/UpdateUser")
+public class UpdateUserServlet extends HttpServlet {
+    private static final long serialVersionUID = 1L;
+
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        String userID = request.getParameter("userID");
+        String firstName = request.getParameter("firstName");
+        String lastName = request.getParameter("lastName");
+        String email = request.getParameter("email");
+        String role = request.getParameter("role");
+        String status = request.getParameter("status");
+        String modifiedBy = (String) request.getSession().getAttribute("userID"); // Assuming userID is stored in session
+
+        try {
+            UserDAL userDAL = new UserDAL();
+            userDAL.updateUser(userID, firstName, lastName, email, role, status, modifiedBy);
+            response.getWriter().write("success");
+        } catch (Exception e) {
+            e.printStackTrace();
+            response.getWriter().write("error");
+        }
+    }
+}
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+
+public class UserDAL {
+    public void updateUser(String userID, String firstName, String lastName, String email, String role, String status, String modifiedBy) throws Exception {
+        try (Connection connection = DB.MySQL()) {
+            String sql = "UPDATE ADMIN_Users SET FirstName = ?, LastName = ?, UserEmail = ?, UserRole = ?, IsActive = ?, ModifiedBy = ? WHERE UserID = ?";
+            try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+                preparedStatement.setString(1, firstName);
+                preparedStatement.setString(2, lastName);
+                preparedStatement.setString(3, email);
+                preparedStatement.setString(4, role);
+                preparedStatement.setString(5, status);
+                preparedStatement.setString(6, modifiedBy);
+                preparedStatement.setString(7, userID);
+                preparedStatement.executeUpdate();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw e;
+        }
+    }
+}
+
