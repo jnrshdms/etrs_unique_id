@@ -1,0 +1,17 @@
+   document.addEventListener('DOMContentLoaded', function() {
+        var emailInput = document.getElementById('userEmail');
+
+        emailInput.addEventListener('input', function() {
+            var email = emailInput.value.trim();
+            var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+            if (emailRegex.test(email)) {
+                emailInput.classList.remove('is-invalid');
+                emailInput.classList.add('is-valid');
+            } else {
+                emailInput.classList.remove('is-valid');
+                emailInput.classList.add('is-invalid');
+            }
+        });
+    });
+
